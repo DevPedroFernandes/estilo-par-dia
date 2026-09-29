@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Paleta da marca: roxo (primária) e amarelo (Mercado Livre) */
+@theme {
+  --color-marca: #9333ea;
+  --color-marca-escuro: #7e22ce;
+  --color-marca-claro: #f3e8ff;
+  --color-ml: #facc15;
+  --color-ml-escuro: #eab308;
+}
+
+.card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -8px rgb(0 0 0 / 0.18);
+}

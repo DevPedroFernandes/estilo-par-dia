@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+.env.production
+.env*.local
+npm-debug.log*
+yarn-debug.log*
+.DS_Store
+Thumbs.db
+.vercelcatalogo.db
+catalogo.db-journal
+*.db
+*.sqlite*
