@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import { registrarBusca, registrarVisita } from "@/lib/visitas";
+import { usePathname } from "next/navigation";
+import { registrarBusca } from "@/lib/visitas";
 
-/** Registra a visita a um produto depois que a página abre no navegador. */
-export default function RegistrarVisita({ sku }: { sku: string }) {
+/** Registra uma visita anónima depois que uma página pública abre no navegador. */
+export default function RegistrarVisita() {
+  const pathname = usePathname();
   useEffect(() => {
-    registrarVisita(sku).catch(() => {});
-  }, [sku]);
+    fetch("/api/visita", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rota: pathname }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [pathname]);
   return null;
 }
 

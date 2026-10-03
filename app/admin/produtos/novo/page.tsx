@@ -20,6 +20,7 @@ export default async function NovoProduto() {
           categorias={categorias}
           inicial={{
             titulo: "", categoria: "", preco: "", link_ml: "", imagens: "",
+            cores: [], tamanhos: [],
             descricao: "", ativo: true, protegido: true, destaque: false, frase_destaque: "",
           }}
         />

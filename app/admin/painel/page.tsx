@@ -2,6 +2,8 @@ import Link from "next/link";
 import CabecalhoAdmin from "@/components/admin/CabecalhoAdmin";
 import GraficoLinha from "@/components/admin/GraficoLinha";
 import { exigirLogin } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { diaBr } from "@/lib/eventos";
 import { calcularMetricas, type Periodo } from "@/lib/metricas";
 
 export const metadata = { title: "Dashboard · Painel" };
@@ -82,6 +84,27 @@ type Props = { searchParams: Promise<{ dias?: string }> };
 
 export default async function Dashboard({ searchParams }: Props) {
   await exigirLogin();
+  const c = await db();
+  const hoje = diaBr();
+  const [resumoHoje, contagemHoje, eventosRecentes] = await Promise.all([
+    c.execute({
+      sql: `SELECT COUNT(*) AS total, SUM(ativo = 1) AS ativos FROM produtos`,
+    }),
+    c.execute({
+      sql: `SELECT
+              (SELECT COUNT(*) FROM visitas WHERE date(criado_em, '-3 hours') = ?) AS visitas,
+              (SELECT COUNT(*) FROM eventos WHERE date(criado_em, '-3 hours') = ? AND tipo IN ('clique', 'clique_ml')) AS cliques_ml,
+              (SELECT COUNT(*) FROM eventos WHERE date(criado_em, '-3 hours') = ? AND tipo = 'clique_shopee') AS cliques_shopee`,
+      args: [hoje, hoje, hoje],
+    }),
+    c.execute({
+      sql: `SELECT e.tipo, COALESCE(NULLIF(e.sku_pai, ''), e.sku) AS sku,
+                   e.criado_em, e.momento, p.titulo
+            FROM eventos e
+            LEFT JOIN produtos p ON p.sku_pai = COALESCE(NULLIF(e.sku_pai, ''), e.sku)
+            ORDER BY e.momento DESC LIMIT 20`,
+    }),
+  ]);
   const { dias } = await searchParams;
   const periodo: Periodo = dias === "7" ? 7 : dias === "90" ? 90 : 30;
   const m = await calcularMetricas(periodo);
@@ -130,6 +153,37 @@ export default async function Dashboard({ searchParams }: Props) {
             <Variacao {...m.kpis.buscas} />
           </Kpi>
         </div>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <Kpi titulo="Total de produtos" valor={num(Number(resumoHoje.rows[0]?.total ?? 0))}>No catálogo</Kpi>
+          <Kpi titulo="Produtos ativos" valor={num(Number(resumoHoje.rows[0]?.ativos ?? 0))}>Disponíveis na vitrine</Kpi>
+          <Kpi titulo="Visitas hoje" valor={num(Number(contagemHoje.rows[0]?.visitas ?? 0))}>{hoje}</Kpi>
+          <Kpi titulo="Cliques ML hoje" valor={num(Number(contagemHoje.rows[0]?.cliques_ml ?? 0))}>{hoje}</Kpi>
+          <Kpi titulo="Cliques Shopee hoje" valor={num(Number(contagemHoje.rows[0]?.cliques_shopee ?? 0))}>{hoje}</Kpi>
+        </div>
+
+        <Cartao titulo="Eventos recentes" sub="Últimas 20 visitas, buscas e ações de compra">
+          {eventosRecentes.rows.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px] text-left text-sm">
+                <thead className="border-b border-gray-200 text-xs text-gray-500">
+                  <tr><th className="py-2 pr-4 font-medium">Evento</th><th className="py-2 pr-4 font-medium">Produto</th><th className="py-2 text-right font-medium">Data</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {eventosRecentes.rows.map((evento, index) => (
+                    <tr key={`${evento.tipo}-${evento.momento}-${index}`}>
+                      <td className="py-2 pr-4">{String(evento.tipo).replaceAll("_", " ")}</td>
+                      <td className="py-2 pr-4">{String(evento.titulo ?? evento.sku ?? "-")}</td>
+                      <td className="py-2 text-right tabular-nums text-gray-500">
+                        {evento.criado_em ? new Date(String(evento.criado_em)).toLocaleString("pt-BR") : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <Vazio texto="Nenhum evento registado ainda." />}
+        </Cartao>
 
         <Cartao titulo="Visitas e cliques por dia" sub={`Últimos ${periodo} dias`}>
           <GraficoLinha

@@ -4,8 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Estilo Paródia",
   description: "Camisetas e vestidos com estampas de paródia.",
-  // <meta name="robots" content="noindex, nofollow"> em todas as páginas
-  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

@@ -6,7 +6,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 
-for (const arq of [".env.local", ".env"]) {
+for (const arq of [".env.preview.local", ".env.local", ".env"]) {
   if (existsSync(arq)) process.loadEnvFile(arq);
 }
 
@@ -26,10 +26,12 @@ async function main() {
     return;
   }
   const conteudo = readFileSync(csv, "utf8");
-  const { novos, atualizados } = await importarCsv(conteudo);
+  const { criados, novos, atualizados, erros, detalhesErros } = await importarCsv(conteudo);
   await setConfig("ultimo_csv", conteudo);
   await setConfig("ultimo_csv_nome", `${csv} (${agoraIso().slice(0, 16).replace("T", " ")})`);
-  console.log(`Importado: ${novos} novos, ${atualizados} atualizados.`);
+  console.log(`Relatório: ${criados} criados, ${atualizados} atualizados, ${erros} erros.`);
+  for (const detalhe of detalhesErros) console.warn(detalhe);
+  if (!criados && !novos && !atualizados && erros) process.exitCode = 1;
 }
 
 main().catch((e) => {

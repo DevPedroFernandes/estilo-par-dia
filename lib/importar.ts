@@ -102,6 +102,19 @@ export function limparLinkMl(url: unknown): string {
   }
 }
 
+function limparLinkShopee(url: unknown): string {
+  const valor = texto(url);
+  try {
+    const parsed = new URL(valor);
+    const host = parsed.hostname.toLowerCase();
+    return parsed.protocol === "https:" && (host === "shopee.com.br" || host.endsWith(".shopee.com.br"))
+      ? parsed.toString()
+      : "";
+  } catch {
+    return "";
+  }
+}
+
 export function nomeEstampa(titulo: string): string {
   const partes = titulo.split(/Estilo Par[óo]dia/i);
   return partes.length > 1 && partes[1].trim() ? partes[1].trim() : titulo;
@@ -139,8 +152,8 @@ type Linha = Record<string, string>;
 /** Importa o conteúdo de um CSV. Devolve quantos produtos são novos e quantos foram atualizados. */
 export async function importarCsv(
   conteudo: string,
-): Promise<{ novos: number; atualizados: number; mantidos: number }> {
-  const { data, meta } = Papa.parse<Linha>(conteudo.replace(/^﻿/, ""), {
+): Promise<{ novos: number; criados: number; atualizados: number; mantidos: number; erros: number; detalhesErros: string[] }> {
+  const { data, meta, errors: errosParser } = Papa.parse<Linha>(conteudo.replace(/^﻿/, ""), {
     header: true,
     skipEmptyLines: true,
     transformHeader: (h) => h.trim(),
@@ -157,12 +170,17 @@ export async function importarCsv(
 
   // Consolida por item_id: se repetir, a última linha vence.
   const produtos = new Map<string, (string | number)[]>();
+  const detalhesErros = errosParser.map((erro) => `Linha ${(erro.row ?? 0) + 2}: ${erro.message}`);
   data.forEach((l, posicao) => {
     const sku = texto(l.item_id);
     const titulo = texto(l.titulo) || texto(l.titulo_pdp);
-    if (!sku || !titulo) return;
+    if (!sku || !titulo) {
+      detalhesErros.push(`Linha ${posicao + 2}: SKU ou título ausente.`);
+      return;
+    }
     const categoria = texto(l.categoria_shopee) || "Outros";
     const imagens = normalizarImagens(texto(l.imagem), l.imagens);
+    const tamanhos = texto(l.tamanhos).split(/[|,;]/).map((t) => t.trim()).filter(Boolean);
     const qtd = Number.parseInt(texto(l.qtd_variacoes), 10);
     produtos.set(sku, [
       sku,
@@ -170,8 +188,11 @@ export async function importarCsv(
       categoria,
       normalizarPreco(texto(l.preco) || l.preco_texto),
       JSON.stringify(normalizarCores(l.cores)),
+      JSON.stringify(tamanhos),
       Number.isFinite(qtd) ? qtd : 0,
       limparLinkMl(l.link),
+      limparLinkShopee(l.link_shopee),
+      imagens[0] ?? texto(l.imagem),
       imagens[0] ?? texto(l.imagem),
       JSON.stringify(imagens),
       limparDescricao(l.descricao, titulo, categoria),
@@ -193,13 +214,19 @@ export async function importarCsv(
   // Tudo numa transação: ou importa tudo, ou nada.
   await c.batch(
     [...produtos.values()].map((args) => ({
-      sql: `INSERT INTO produtos (sku_pai, titulo, categoria, preco, cores, qtd_variacoes,
-              link_ml, imagem, imagens, descricao, busca, ordem_csv, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      sql: `INSERT INTO produtos (sku_pai, titulo, categoria, preco, cores, tamanhos, qtd_variacoes,
+              link_ml, link_shopee, imagem, imagem_principal, imagens, descricao, busca, ordem_csv,
+              criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(sku_pai) DO UPDATE SET
               titulo = excluded.titulo, categoria = excluded.categoria, preco = excluded.preco,
-              cores = excluded.cores, qtd_variacoes = excluded.qtd_variacoes,
-              link_ml = excluded.link_ml, imagem = excluded.imagem, imagens = excluded.imagens,
+              cores = excluded.cores,
+              tamanhos = CASE WHEN excluded.tamanhos = '[]' THEN produtos.tamanhos ELSE excluded.tamanhos END,
+              qtd_variacoes = excluded.qtd_variacoes,
+              link_ml = excluded.link_ml,
+              link_shopee = COALESCE(NULLIF(excluded.link_shopee, ''), produtos.link_shopee),
+              imagem = excluded.imagem, imagem_principal = excluded.imagem_principal,
+              imagens = excluded.imagens,
               descricao = excluded.descricao, busca = excluded.busca,
               ordem_csv = excluded.ordem_csv, atualizado_em = excluded.atualizado_em
             WHERE produtos.protegido = 0`,
@@ -211,5 +238,12 @@ export async function importarCsv(
 
   const novos = [...produtos.keys()].filter((k) => !existentes.has(k)).length;
   const mantidos = [...produtos.keys()].filter((k) => protegidos.has(k)).length;
-  return { novos, atualizados: produtos.size - novos - mantidos, mantidos };
+  return {
+    novos,
+    criados: novos,
+    atualizados: produtos.size - novos - mantidos,
+    mantidos,
+    erros: detalhesErros.length,
+    detalhesErros: detalhesErros.slice(0, 50),
+  };
 }

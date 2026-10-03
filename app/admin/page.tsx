@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import FormLogin from "@/components/admin/FormLogin";
 import { estaLogado } from "@/lib/auth";
 
-export const metadata = { title: "Área admin · Estilo Paródia" };
+export const metadata = {
+  title: "Área admin · Estilo Paródia",
+  robots: { index: false, follow: false },
+};
 
 /** Tela de login do painel. */
 export default async function Login() {

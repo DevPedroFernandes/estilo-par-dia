@@ -11,7 +11,7 @@ export function dispositivo(userAgent: string | null): string {
 }
 
 type Evento = {
-  tipo: "visita" | "clique" | "busca";
+  tipo: "visita" | "clique" | "clique_ml" | "clique_shopee" | "busca";
   sku?: string;
   termo?: string;
   resultados?: number;
@@ -23,11 +23,14 @@ export async function registrarEvento(e: Evento): Promise<void> {
   try {
     const c = await db();
     const agora = Date.now();
+    const criadoEm = new Date(agora).toISOString();
     await c.execute({
-      sql: `INSERT INTO eventos (tipo, sku, termo, resultados, dispositivo, dia, momento)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO eventos (sku_pai, tipo, criado_em, sku, termo, resultados, dispositivo, dia, momento)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
+        e.sku ?? "",
         e.tipo,
+        criadoEm,
         e.sku ?? null,
         e.termo ?? null,
         e.resultados ?? null,

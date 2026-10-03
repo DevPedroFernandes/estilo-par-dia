@@ -1,4 +1,8 @@
 import { createClient, type Client } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import * as schema from "./schema";
+
+type BancoDrizzle = LibSQLDatabase<typeof schema>;
 
 /**
  * Banco de dados: SQLite via libSQL.
@@ -9,16 +13,20 @@ import { createClient, type Client } from "@libsql/client";
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS produtos (
-    sku_pai        TEXT PRIMARY KEY,           -- item_id do ML (ex.: MLB7683834798)
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku_pai        TEXT NOT NULL UNIQUE,
     titulo         TEXT NOT NULL,
+    descricao      TEXT NOT NULL DEFAULT '',
     categoria      TEXT NOT NULL DEFAULT '',
     preco          REAL NOT NULL DEFAULT 0,
+    imagem_principal TEXT NOT NULL DEFAULT '',
+    tamanhos       TEXT NOT NULL DEFAULT '[]',
+    link_shopee    TEXT,
     cores          TEXT NOT NULL DEFAULT '[]', -- JSON: [{"nome":"Preto","hex":"#000000"}]
     qtd_variacoes  INTEGER NOT NULL DEFAULT 0,
-    link_ml        TEXT NOT NULL DEFAULT '',
+    link_ml        TEXT,
     imagem         TEXT NOT NULL DEFAULT '',
     imagens        TEXT NOT NULL DEFAULT '[]', -- JSON: URLs sem repetição
-    descricao      TEXT NOT NULL DEFAULT '',
     busca          TEXT NOT NULL DEFAULT '',   -- título + categoria sem acento
     ordem_csv      INTEGER NOT NULL DEFAULT 0,
     ativo          INTEGER NOT NULL DEFAULT 1,
@@ -40,7 +48,10 @@ const SCHEMA = [
   // Não guardamos IP nem nada que identifique o visitante.
   `CREATE TABLE IF NOT EXISTS eventos (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo        TEXT NOT NULL,              -- 'visita' | 'clique' | 'busca'
+    sku_pai     TEXT NOT NULL DEFAULT '',
+    tipo        TEXT NOT NULL,
+    ip_hash     TEXT NOT NULL DEFAULT '',
+    criado_em   TEXT NOT NULL DEFAULT '',
     sku         TEXT,                       -- produto (visita e clique)
     termo       TEXT,                       -- texto buscado (busca)
     resultados  INTEGER,                    -- quantos produtos a busca achou
@@ -49,10 +60,29 @@ const SCHEMA = [
     momento     INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_eventos_dia ON eventos (dia, tipo)`,
+  `CREATE TABLE IF NOT EXISTS visitas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rota TEXT NOT NULL,
+    ip_hash TEXT NOT NULL,
+    user_agent TEXT NOT NULL DEFAULT '',
+    referrer TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_visitas_criado_em ON visitas (criado_em)`,
+  `CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL
+  )`,
 ];
 
 /** Colunas adicionadas depois da primeira versão: bancos antigos ganham na hora. */
 const COLUNAS_NOVAS: [string, string][] = [
+  ["id", "INTEGER"],
+  ["descricao", "TEXT NOT NULL DEFAULT ''"],
+  ["imagem_principal", "TEXT NOT NULL DEFAULT ''"],
+  ["tamanhos", "TEXT NOT NULL DEFAULT '[]'"],
+  ["link_shopee", "TEXT"],
   ["origem", "TEXT NOT NULL DEFAULT 'csv'"],
   ["protegido", "INTEGER NOT NULL DEFAULT 0"],
   ["destaque", "INTEGER NOT NULL DEFAULT 0"],
@@ -67,17 +97,39 @@ async function migrar(c: Client): Promise<void> {
   for (const [nome, tipo] of COLUNAS_NOVAS) {
     if (!existentes.has(nome)) await c.execute(`ALTER TABLE produtos ADD COLUMN ${nome} ${tipo}`);
   }
+  await c.execute("UPDATE produtos SET id = rowid WHERE id IS NULL");
+  await c.execute("UPDATE produtos SET imagem_principal = imagem WHERE imagem_principal = '' AND imagem <> ''");
+
+  const eventosExistentes = new Set(
+    (await c.execute("PRAGMA table_info(eventos)")).rows.map((r) => r.name as string),
+  );
+  for (const [nome, tipo] of [
+    ["sku_pai", "TEXT NOT NULL DEFAULT ''"],
+    ["ip_hash", "TEXT NOT NULL DEFAULT ''"],
+    ["criado_em", "TEXT NOT NULL DEFAULT ''"],
+  ]) {
+    if (!eventosExistentes.has(nome)) await c.execute(`ALTER TABLE eventos ADD COLUMN ${nome} ${tipo}`);
+  }
 }
 
 let cliente: Client | null = null;
+let clienteDrizzle: BancoDrizzle | null = null;
 let pronto: Promise<void> | null = null;
 
 export async function db(): Promise<Client> {
   if (!cliente) {
+    const preview = process.env.VERCEL_ENV === "preview";
+    const urlConfigurada = preview
+      ? process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL
+      : process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
+    const url = urlConfigurada || (process.env.NODE_ENV === "production" ? "" : "file:catalogo.db");
+    if (!url) throw new Error("DATABASE_URL é obrigatório em produção.");
     cliente = createClient({
       // Aceita também os nomes TURSO_* que algumas integrações criam sozinhas.
-      url: process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL || "file:catalogo.db",
-      authToken: process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || undefined,
+      url,
+      authToken: (preview
+        ? process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN
+        : process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN) || undefined,
     });
   }
   if (!pronto) {
@@ -87,6 +139,12 @@ export async function db(): Promise<Client> {
   }
   await pronto;
   return cliente;
+}
+
+export async function drizzleDb(): Promise<BancoDrizzle> {
+  const client = await db();
+  clienteDrizzle ??= drizzle(client, { schema });
+  return clienteDrizzle;
 }
 
 export async function getConfig(chave: string): Promise<string> {

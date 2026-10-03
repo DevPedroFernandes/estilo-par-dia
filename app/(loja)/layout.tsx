@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RegistrarVisita from "@/components/RegistrarVisita";
 
 // Links do rodapé vêm do ambiente. Os provisórios devem ser trocados no .env.local / Vercel.
 const INSTAGRAM_URL = process.env.INSTAGRAM_URL || "https://instagram.com/lorem-ipsum";
@@ -8,6 +9,7 @@ const LOJA_ML_URL = process.env.LOJA_ML_URL || "https://lista.mercadolivre.com.b
 export default function LojaLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <RegistrarVisita />
       {children}
 
       <footer className="mt-8 border-t border-gray-100 bg-white">

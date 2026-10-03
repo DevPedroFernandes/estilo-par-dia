@@ -52,17 +52,17 @@ export async function calcularMetricas(periodo: Periodo): Promise<Metricas> {
     }),
     c.execute({
       sql: `SELECT e.sku, p.titulo,
-              SUM(e.tipo = 'visita') AS visitas, SUM(e.tipo = 'clique') AS cliques
+              SUM(e.tipo = 'visita') AS visitas, SUM(e.tipo IN ('clique', 'clique_ml', 'clique_shopee')) AS cliques
             FROM eventos e JOIN produtos p ON p.sku_pai = e.sku
-            WHERE e.dia BETWEEN ? AND ? AND e.tipo IN ('visita', 'clique')
+            WHERE e.dia BETWEEN ? AND ? AND e.tipo IN ('visita', 'clique', 'clique_ml', 'clique_shopee')
             GROUP BY e.sku ORDER BY visitas DESC, cliques DESC LIMIT 10`,
       args: [inicio, fim],
     }),
     c.execute({
       sql: `SELECT p.categoria,
-              SUM(e.tipo = 'visita') AS visitas, SUM(e.tipo = 'clique') AS cliques
+              SUM(e.tipo = 'visita') AS visitas, SUM(e.tipo IN ('clique', 'clique_ml', 'clique_shopee')) AS cliques
             FROM eventos e JOIN produtos p ON p.sku_pai = e.sku
-            WHERE e.dia BETWEEN ? AND ? AND e.tipo IN ('visita', 'clique')
+            WHERE e.dia BETWEEN ? AND ? AND e.tipo IN ('visita', 'clique', 'clique_ml', 'clique_shopee')
             GROUP BY p.categoria ORDER BY visitas DESC`,
       args: [inicio, fim],
     }),
@@ -95,7 +95,9 @@ export async function calcularMetricas(periodo: Periodo): Promise<Metricas> {
   const mapa = new Map<string, number>();
   for (const r of porDia.rows) mapa.set(`${r.dia}|${r.tipo}`, Number(r.n));
   const visitasPorDia = dias.map((d) => mapa.get(`${d}|visita`) ?? 0);
-  const cliquesPorDia = dias.map((d) => mapa.get(`${d}|clique`) ?? 0);
+  const cliquesPorDia = dias.map((d) =>
+    (mapa.get(`${d}|clique`) ?? 0) + (mapa.get(`${d}|clique_ml`) ?? 0) + (mapa.get(`${d}|clique_shopee`) ?? 0),
+  );
   const buscasPeriodo = dias.reduce((s, d) => s + (mapa.get(`${d}|busca`) ?? 0), 0);
 
   const ant = new Map(anterior.rows.map((r) => [r.tipo as string, Number(r.n)]));
@@ -103,7 +105,7 @@ export async function calcularMetricas(periodo: Periodo): Promise<Metricas> {
   const visitas = soma(visitasPorDia);
   const cliques = soma(cliquesPorDia);
   const visitasAnt = ant.get("visita") ?? 0;
-  const cliquesAnt = ant.get("clique") ?? 0;
+  const cliquesAnt = (ant.get("clique") ?? 0) + (ant.get("clique_ml") ?? 0) + (ant.get("clique_shopee") ?? 0);
 
   const dispMap = new Map(disp.rows.map((r) => [r.dispositivo as string, Number(r.n)]));
 

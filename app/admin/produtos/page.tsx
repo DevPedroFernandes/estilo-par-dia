@@ -43,10 +43,16 @@ export default async function Produtos({ searchParams }: Props) {
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">Produtos</h1>
-          <Link href="/admin/produtos/novo"
-                className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white hover:bg-marca-escuro">
-            + Novo produto
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/admin/produtos/importar"
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold hover:border-marca hover:text-marca">
+              Importar CSV
+            </Link>
+            <Link href="/admin/produtos/novo"
+                  className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white hover:bg-marca-escuro">
+              + Novo produto
+            </Link>
+          </div>
         </div>
 
         <ImportarCsv ultimoCsv={ultimoCsv} />

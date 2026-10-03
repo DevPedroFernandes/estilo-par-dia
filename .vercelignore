@@ -1,0 +1,16 @@
+.git/
+.next/
+node_modules/
+.vercel/
+.vscode/
+.env*
+catalogo.db*
+*.db
+*.sqlite*
+produtos_ml_completo.csv
+README.md
+DEPLOY_VERCEL.md
+AGENTS.md
+CLAUDE.md
+public/uploads/
+tsconfig.tsbuildinfo

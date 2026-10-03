@@ -44,6 +44,8 @@ export default async function EditarProduto({ params }: { params: Promise<{ sku:
             categoria: p.categoria as string,
             preco: Number(p.preco).toFixed(2).replace(".", ","),
             link_ml: p.link_ml as string,
+            cores: JSON.parse((p.cores as string) || "[]"),
+            tamanhos: JSON.parse((p.tamanhos as string) || "[]"),
             imagens: (imagens.length ? imagens : [p.imagem as string]).filter(Boolean).join("\n"),
             descricao: descricaoParaEdicao(p.descricao as string),
             ativo: Number(p.ativo) === 1,

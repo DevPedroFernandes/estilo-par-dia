@@ -8,8 +8,10 @@ export type Produto = {
   categoria: string;
   preco: number;
   cores: Cor[];
+  tamanhos: string[];
   qtd_variacoes: number;
   link_ml: string;
+  link_shopee: string | null;
   imagem: string;
   imagens: string[];
   descricao: string;
@@ -31,8 +33,10 @@ function paraProduto(r: Record<string, unknown>): Produto {
     categoria: r.categoria as string,
     preco: Number(r.preco),
     cores: JSON.parse((r.cores as string) || "[]"),
+    tamanhos: JSON.parse((r.tamanhos as string) || "[]"),
     qtd_variacoes: Number(r.qtd_variacoes),
     link_ml: r.link_ml as string,
+    link_shopee: (r.link_shopee as string | null) ?? null,
     imagem: r.imagem as string,
     imagens: imagens.length ? imagens : r.imagem ? [r.imagem as string] : [],
     descricao: r.descricao as string,
@@ -49,8 +53,14 @@ export async function listarProdutos(q: string, cat: string, ordem: Ordem): Prom
     args.push(`%${termo.replace(/[\\%_]/g, (c) => "\\" + c)}%`);
   }
   if (cat) {
-    sql += " AND categoria = ?";
-    args.push(cat);
+    if (cat === "Camisetas") {
+      sql += " AND categoria IN ('Camisetas', 'Camisetas e Regatas', 'Camisetões')";
+    } else if (cat === "Vestidos") {
+      sql += " AND categoria LIKE '%Vestido%'";
+    } else {
+      sql += " AND categoria = ?";
+      args.push(cat);
+    }
   }
   sql += " ORDER BY " + ORDENACOES[ordem].sql; // vem do objeto fixo, não do usuário
   const c = await db();
@@ -60,10 +70,7 @@ export async function listarProdutos(q: string, cat: string, ordem: Ordem): Prom
 export async function listarCategorias(): Promise<string[]> {
   await connection();
   const c = await db();
-  const r = await c.execute(
-    "SELECT categoria, COUNT(*) AS n FROM produtos WHERE ativo = 1 GROUP BY categoria ORDER BY n DESC",
-  );
-  return r.rows.map((x) => x.categoria as string);
+  return ["Camisetas", "Vestidos"];
 }
 
 export async function buscarProduto(sku: string): Promise<Produto | null> {

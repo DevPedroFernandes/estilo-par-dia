@@ -50,7 +50,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
         {mostrarBanner && <BannerCarrossel slides={destaques} />}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <nav aria-label="Categorias" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-            <Link href={urlVitrine(q, "", ordem)} className={chip(!cat)}>Todos</Link>
+            <Link href={urlVitrine(q, "", ordem)} className={chip(!cat)}>Todas</Link>
             {categorias.map((c) => (
               <Link key={c} href={urlVitrine(q, c, ordem)} className={chip(cat === c)}>{c}</Link>
             ))}
@@ -84,10 +84,20 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
                     {p.titulo}
                   </Link>
                   <p className="mt-auto text-lg font-bold">{formatarBrl(p.preco)}</p>
-                  <a href={`/ir/${p.sku_pai}`} target="_blank" rel="noopener"
+                  <a href={`/ir/${p.sku_pai}/ml`} target="_blank" rel="noopener"
                      className="rounded-lg bg-ml py-2 text-center text-sm font-semibold text-gray-900 hover:bg-ml-escuro">
                     Mercado Livre
                   </a>
+                  {p.link_shopee ? (
+                    <a href={`/ir/${p.sku_pai}/shopee`} target="_blank" rel="noopener"
+                       className="rounded-lg bg-shopee py-2 text-center text-sm font-semibold text-white hover:bg-shopee-escuro">
+                      Shopee
+                    </a>
+                  ) : (
+                    <span className="rounded-lg bg-gray-100 py-2 text-center text-sm font-semibold text-gray-500">
+                      Em breve
+                    </span>
+                  )}
                 </div>
               </article>
             ))}
