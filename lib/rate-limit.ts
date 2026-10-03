@@ -1,18 +1,19 @@
-import { createHmac } from "node:crypto";
 import { db } from "./db";
+import { hashIp } from "./seguranca";
 
 const LIMITE = 5;
 const JANELA_MS = 5 * 60 * 1000;
 
-function chaveRateLimit(ip: string): string {
-  const segredo = process.env.IP_HASH_SECRET || process.env.AUTH_SECRET || process.env.SECRET_KEY || process.env.ADMIN_SENHA || "local-rate-limit";
-  return createHmac("sha256", segredo).update(ip).digest("hex");
+function chaveRateLimit(ip: string): string | null {
+  return hashIp(ip, "login");
 }
 
 /** Atomically records an attempt and permits at most five within the window. */
 export async function permitirTentativaLogin(ip: string): Promise<boolean> {
-  const c = await db();
   const identificador = chaveRateLimit(ip);
+  if (!identificador) return false;
+
+  const c = await db();
   const agora = Date.now();
   const limite = agora - JANELA_MS;
   const resultados = await c.batch([
@@ -28,6 +29,9 @@ export async function permitirTentativaLogin(ip: string): Promise<boolean> {
 }
 
 export async function limparFalhas(ip: string): Promise<void> {
+  const identificador = chaveRateLimit(ip);
+  if (!identificador) return;
+
   const c = await db();
-  await c.execute({ sql: "DELETE FROM login_falhas WHERE ip = ?", args: [chaveRateLimit(ip)] });
+  await c.execute({ sql: "DELETE FROM login_falhas WHERE ip = ?", args: [identificador] });
 }

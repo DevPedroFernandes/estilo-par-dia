@@ -52,7 +52,8 @@ export async function calcularMetricas(periodo: Periodo): Promise<Metricas> {
     }),
     c.execute({
       sql: `SELECT e.sku, p.titulo,
-              SUM(e.tipo = 'visita') AS visitas, SUM(e.tipo IN ('clique', 'clique_ml', 'clique_shopee')) AS cliques
+              COALESCE(SUM(CASE WHEN e.tipo = 'visita' THEN 1 ELSE 0 END), 0) AS visitas,
+              COALESCE(SUM(CASE WHEN e.tipo IN ('clique', 'clique_ml', 'clique_shopee') THEN 1 ELSE 0 END), 0) AS cliques
             FROM eventos e JOIN produtos p ON p.sku_pai = e.sku
             WHERE e.dia BETWEEN ? AND ? AND e.tipo IN ('visita', 'clique', 'clique_ml', 'clique_shopee')
             GROUP BY e.sku ORDER BY visitas DESC, cliques DESC LIMIT 10`,
@@ -60,7 +61,8 @@ export async function calcularMetricas(periodo: Periodo): Promise<Metricas> {
     }),
     c.execute({
       sql: `SELECT p.categoria,
-              SUM(e.tipo = 'visita') AS visitas, SUM(e.tipo IN ('clique', 'clique_ml', 'clique_shopee')) AS cliques
+              COALESCE(SUM(CASE WHEN e.tipo = 'visita' THEN 1 ELSE 0 END), 0) AS visitas,
+              COALESCE(SUM(CASE WHEN e.tipo IN ('clique', 'clique_ml', 'clique_shopee') THEN 1 ELSE 0 END), 0) AS cliques
             FROM eventos e JOIN produtos p ON p.sku_pai = e.sku
             WHERE e.dia BETWEEN ? AND ? AND e.tipo IN ('visita', 'clique', 'clique_ml', 'clique_shopee')
             GROUP BY p.categoria ORDER BY visitas DESC`,

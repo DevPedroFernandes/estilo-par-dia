@@ -1,9 +1,10 @@
 import "server-only";
-import { createHash, createHmac, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "./db";
+import { segredoSessao } from "./seguranca";
 
 /**
  * Autenticação do painel (/admin) — versão simplificada.
@@ -34,7 +35,6 @@ export function senhaPadraoEmProducao(): boolean {
   return !usuario() || !senha() || senha() === SENHA_PADRAO;
 }
 
-/** Compara dois textos em tempo constante (não revela onde está a diferença). */
 function iguais(a: string, b: string): boolean {
   const ha = createHash("sha256").update(a).digest();
   const hb = createHash("sha256").update(b).digest();
@@ -43,10 +43,7 @@ function iguais(a: string, b: string): boolean {
 
 export function credenciaisConferem(u: string, s: string): boolean {
   const usuarioOk = iguais(u, usuario());
-  const salt = process.env.AUTH_SECRET || process.env.SECRET_KEY || "estilo-parodia-admin";
-  const senhaInformada = scryptSync(s, salt, 64);
-  const senhaConfigurada = scryptSync(senha(), salt, 64);
-  const senhaOk = timingSafeEqual(senhaInformada, senhaConfigurada);
+  const senhaOk = iguais(s, senha());
   return usuarioOk && senhaOk;
 }
 
@@ -58,9 +55,7 @@ const COOKIE = "ep_sessao";
 const DURACAO_S = 12 * 60 * 60;
 
 function assinar(valor: string): string {
-  const chave = createHash("sha256")
-    .update(`ep-sessao|${usuario()}|${senha()}|${process.env.SECRET_KEY || process.env.AUTH_SECRET || senha()}`)
-    .digest();
+  const chave = createHash("sha256").update(`${segredoSessao()}`).digest();
   return createHmac("sha256", chave).update(valor).digest("base64url");
 }
 
@@ -99,18 +94,36 @@ export async function exigirLogin(): Promise<void> {
 // Rate limit: 5 falhas em 5 minutos por IP (guardado no banco)
 // ---------------------------------------------------------------------------
 
-const LIMITE = 5;
-const JANELA_MS = 5 * 60 * 1000;
-
 export async function ipCliente(): Promise<string> {
   const h = await headers();
-  const estaNaVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
-  if (!estaNaVercel) return "local";
+  const ambiente = process.env.TRUSTED_PROXY ?? "";
+  const vercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
 
-  for (const cabecalho of ["x-vercel-forwarded-for", "x-forwarded-for", "x-real-ip"]) {
-    const candidato = h.get(cabecalho)?.split(",")[0]?.trim() ?? "";
+  if (process.env.NODE_ENV !== "production") return "local";
+
+  if (vercel) {
+    const candidato = h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ?? "";
+    if (isIP(candidato)) return candidato;
+    console.warn("ipCliente: x-vercel-forwarded-for ausente em produção.");
+    return "unknown";
+  }
+
+  if (ambiente === "cloudflare") {
+    const candidato = h.get("cf-connecting-ip")?.trim() ?? "";
     if (isIP(candidato)) return candidato;
   }
+
+  if (ambiente === "xff") {
+    const candidato = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+    if (isIP(candidato)) return candidato;
+  }
+
+  if (ambiente === "vercel") {
+    const candidato = h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ?? "";
+    if (isIP(candidato)) return candidato;
+  }
+
+  console.warn("ipCliente: proxy não confiável em produção; aplicando limite global.");
   return "unknown";
 }
 

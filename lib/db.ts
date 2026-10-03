@@ -40,26 +40,24 @@ const SCHEMA = [
     frase_destaque TEXT NOT NULL DEFAULT ''     -- frase própria do banner (opcional)
   )`,
   `CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT NOT NULL)`,
-  // Tentativas de login com falha. Na Vercel cada requisição pode cair numa
-  // instância diferente, então o limite precisa ficar no banco, não na memória.
   `CREATE TABLE IF NOT EXISTS login_falhas (ip TEXT NOT NULL, momento INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS idx_login_falhas ON login_falhas (ip, momento)`,
-  // Eventos para o dashboard: uma linha por visita, clique no ML ou busca.
-  // Não guardamos IP nem nada que identifique o visitante.
   `CREATE TABLE IF NOT EXISTS eventos (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     sku_pai     TEXT NOT NULL DEFAULT '',
     tipo        TEXT NOT NULL,
     ip_hash     TEXT NOT NULL DEFAULT '',
     criado_em   TEXT NOT NULL DEFAULT '',
-    sku         TEXT,                       -- produto (visita e clique)
-    termo       TEXT,                       -- texto buscado (busca)
-    resultados  INTEGER,                    -- quantos produtos a busca achou
-    dispositivo TEXT NOT NULL DEFAULT '',   -- 'celular' | 'computador'
-    dia         TEXT NOT NULL,              -- AAAA-MM-DD no horário de Brasília
+    sku         TEXT,
+    termo       TEXT,
+    resultados  INTEGER,
+    dispositivo TEXT NOT NULL DEFAULT '',
+    dia         TEXT NOT NULL,
     momento     INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_eventos_dia ON eventos (dia, tipo)`,
+  `CREATE INDEX IF NOT EXISTS idx_eventos_sku_tipo_dia ON eventos (sku, tipo, dia)`,
+  `CREATE INDEX IF NOT EXISTS idx_eventos_momento ON eventos (momento)`,
   `CREATE TABLE IF NOT EXISTS visitas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     rota TEXT NOT NULL,
@@ -116,16 +114,22 @@ let cliente: Client | null = null;
 let clienteDrizzle: BancoDrizzle | null = null;
 let pronto: Promise<void> | null = null;
 
+export function resolucaoBanco(): string {
+  if (process.env.VERCEL_ENV === "preview") {
+    const url = process.env.TURSO_DATABASE_URL ?? "";
+    if (!url) throw new Error("Preview exige TURSO_DATABASE_URL definido; não use credenciais de Production.");
+    return url;
+  }
+
+  return process.env.DATABASE_URL ?? process.env.TURSO_DATABASE_URL ?? (process.env.NODE_ENV === "production" ? "" : "file:catalogo.db");
+}
+
 export async function db(): Promise<Client> {
   if (!cliente) {
-    const preview = process.env.VERCEL_ENV === "preview";
-    const urlConfigurada = preview
-      ? process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL
-      : process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
-    const url = urlConfigurada || (process.env.NODE_ENV === "production" ? "" : "file:catalogo.db");
+    const url = resolucaoBanco();
     if (!url) throw new Error("DATABASE_URL é obrigatório em produção.");
+    const preview = process.env.VERCEL_ENV === "preview";
     cliente = createClient({
-      // Aceita também os nomes TURSO_* que algumas integrações criam sozinhas.
       url,
       authToken: (preview
         ? process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN
@@ -133,7 +137,6 @@ export async function db(): Promise<Client> {
     });
   }
   if (!pronto) {
-    // Cria as tabelas uma vez por processo.
     pronto = migrar(cliente);
     pronto.catch(() => (pronto = null));
   }

@@ -43,26 +43,37 @@ function paraProduto(r: Record<string, unknown>): Produto {
   };
 }
 
+export function categoriaParaChip(categoria: string): string {
+  const valor = (categoria ?? "").trim();
+  if (!valor) return "Outros";
+  const normal = valor.toLowerCase();
+  if (normal.includes("vestido")) return "Vestidos";
+  if (normal.includes("camiseta") || normal.includes("regata") || normal.includes("camisetão")) return "Camisetas";
+  return valor;
+}
+
 export async function listarProdutos(q: string, cat: string, ordem: Ordem): Promise<Produto[]> {
-  await connection(); // sempre lê do banco na hora (nada de página congelada no build)
+  await connection();
   let sql = "SELECT * FROM produtos WHERE ativo = 1";
   const args: string[] = [];
-  // Busca sem acento: "chico" encontra "Chicó". Cada palavra precisa aparecer.
   for (const termo of semAcento(q).split(/\s+/).filter(Boolean)) {
     sql += " AND busca LIKE ? ESCAPE '\\'";
     args.push(`%${termo.replace(/[\\%_]/g, (c) => "\\" + c)}%`);
   }
   if (cat) {
-    if (cat === "Camisetas") {
-      sql += " AND categoria IN ('Camisetas', 'Camisetas e Regatas', 'Camisetões')";
-    } else if (cat === "Vestidos") {
-      sql += " AND categoria LIKE '%Vestido%'";
+    const chip = categoriaParaChip(cat);
+    if (chip === "Camisetas") {
+      sql += " AND (categoria = ? OR categoria LIKE ? OR categoria LIKE ? OR categoria LIKE ?)";
+      args.push("Camisetas", "%Camisetas%", "%Regatas%", "%Camisetões%") ;
+    } else if (chip === "Vestidos") {
+      sql += " AND categoria LIKE ?";
+      args.push("%Vestido%");
     } else {
       sql += " AND categoria = ?";
       args.push(cat);
     }
   }
-  sql += " ORDER BY " + ORDENACOES[ordem].sql; // vem do objeto fixo, não do usuário
+  sql += " ORDER BY " + ORDENACOES[ordem].sql;
   const c = await db();
   return (await c.execute({ sql, args })).rows.map((r) => paraProduto(r as Record<string, unknown>));
 }
@@ -70,7 +81,16 @@ export async function listarProdutos(q: string, cat: string, ordem: Ordem): Prom
 export async function listarCategorias(): Promise<string[]> {
   await connection();
   const c = await db();
-  return ["Camisetas", "Vestidos"];
+  const r = await c.execute("SELECT DISTINCT categoria FROM produtos WHERE ativo = 1 AND categoria <> '' ORDER BY categoria");
+  const chips = new Set<string>();
+  for (const row of r.rows) {
+    const categoria = String(row.categoria ?? "").trim();
+    if (!categoria) continue;
+    chips.add(categoriaParaChip(categoria));
+  }
+  const principais = ["Camisetas", "Vestidos"];
+  const demais = [...chips].filter((categoria) => !principais.includes(categoria)).sort((a, b) => a.localeCompare(b));
+  return [...principais, ...demais].filter((categoria, index, arr) => arr.indexOf(categoria) === index);
 }
 
 export async function buscarProduto(sku: string): Promise<Produto | null> {

@@ -1,8 +1,8 @@
 /**
  * Importa o produtos_ml_completo.csv da raiz do projeto para o banco.
- *   npm run seed            -> só importa se o banco estiver vazio
- *   npm run seed -- --forcar -> importa mesmo com produtos (UPSERT, não duplica)
- * Roda sozinho antes do "npm run dev" (script predev).
+ *   npm run seed            -> sempre importa (ou usa a flag --forcar para ignorar o guard)
+ *   npm run seed -- --so-local -> só executa quando o banco estiver em SQLite local.
+ * Roda antes do "npm run dev" via predev.
  */
 import { existsSync, readFileSync } from "node:fs";
 
@@ -11,8 +11,15 @@ for (const arq of [".env.preview.local", ".env.local", ".env"]) {
 }
 
 async function main() {
-  const { db, setConfig } = await import("../lib/db");
+  const { db, resolucaoBanco, setConfig } = await import("../lib/db");
   const { importarCsv, agoraIso } = await import("../lib/importar");
+
+  const soLocal = process.argv.includes("--so-local");
+  const urlBanco = resolucaoBanco();
+  if (soLocal && !urlBanco.startsWith("file:")) {
+    console.warn(`Ignorando seed: banco remoto (${urlBanco}) não é local. Use npm run seed para importar manualmente.`);
+    return;
+  }
 
   const csv = "produtos_ml_completo.csv";
   const c = await db();

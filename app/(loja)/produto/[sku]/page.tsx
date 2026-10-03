@@ -41,7 +41,7 @@ export default async function PaginaProduto({ params, searchParams }: Props) {
               <p className="text-sm font-medium text-marca">{p.categoria}</p>
               <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">{p.titulo}</h1>
               <p className="mt-3 text-3xl font-extrabold">{formatarBrl(p.preco)}</p>
-              <p className="mt-1 text-sm text-gray-600">3x de {formatarBrl(p.preco / 3)} sem juros</p>
+              <p className="mt-1 text-sm text-gray-600">Parcelamento conforme as condições do marketplace.</p>
             </div>
 
               <VariantesProduto cores={p.cores} tamanhos={p.tamanhos} />

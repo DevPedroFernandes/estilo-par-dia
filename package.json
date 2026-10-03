@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "predev": "tsx scripts/seed.ts",
+    "predev": "tsx scripts/seed.ts --so-local",
     "build": "next build",
     "start": "next start",
     "seed": "tsx scripts/seed.ts",

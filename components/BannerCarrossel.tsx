@@ -82,7 +82,7 @@ export default function BannerCarrossel({ slides }: { slides: Destaque[] }) {
                 <strong className="text-white">{brl(s.preco)}</strong>
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <a href={`/ir/${s.sku_pai}`} target="_blank" rel="noopener"
+                <a href={`/ir/${s.sku_pai}/ml`} target="_blank" rel="noopener"
                    className="rounded-full bg-ml px-6 py-3 text-sm font-bold text-gray-900 shadow-sm hover:bg-ml-escuro">
                   Comprar no Mercado Livre
                 </a>

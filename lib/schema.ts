@@ -45,6 +45,20 @@ export const visitas = sqliteTable(
   (table) => [index("visitas_criado_em_idx").on(table.criado_em)],
 );
 
+export const config = sqliteTable("config", {
+  chave: text("chave").primaryKey(),
+  valor: text("valor").notNull(),
+});
+
+export const loginFalhas = sqliteTable(
+  "login_falhas",
+  {
+    ip: text("ip").notNull(),
+    momento: integer("momento").notNull(),
+  },
+  (table) => [index("idx_login_falhas").on(table.ip, table.momento)],
+);
+
 export const eventos = sqliteTable(
   "eventos",
   {
@@ -60,7 +74,11 @@ export const eventos = sqliteTable(
     dia: text("dia").notNull().default(""),
     momento: integer("momento").notNull().default(0),
   },
-  (table) => [index("eventos_criado_em_idx").on(table.criado_em)],
+  (table) => [
+    index("eventos_criado_em_idx").on(table.criado_em),
+    index("idx_eventos_sku_tipo_dia").on(table.sku, table.tipo, table.dia),
+    index("idx_eventos_momento").on(table.momento),
+  ],
 );
 
 export const usuarios = sqliteTable("usuarios", {

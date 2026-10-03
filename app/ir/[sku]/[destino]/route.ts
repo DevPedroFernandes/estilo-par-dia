@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { diaBr, dispositivo } from "@/lib/eventos";
+import { hashIp } from "@/lib/seguranca";
 
 type Destino = "ml" | "shopee";
 
@@ -40,9 +40,8 @@ export async function GET(
   }
 
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwarded || request.headers.get("x-real-ip") || "unknown";
-  const segredo = process.env.IP_HASH_SECRET || process.env.AUTH_SECRET || process.env.SECRET_KEY || "";
-  const ipHash = createHash("sha256").update(`${segredo}:${ip}`).digest("hex");
+  const ip = forwarded || request.headers.get("x-real-ip") || request.headers.get("cf-connecting-ip") || "unknown";
+  const ipHash = hashIp(ip, "analytics") ?? "";
   const criadoEm = new Date().toISOString();
   const tipo = destino === "ml" ? "clique_ml" : "clique_shopee";
   await c.execute({

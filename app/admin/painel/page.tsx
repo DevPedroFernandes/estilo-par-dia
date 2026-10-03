@@ -143,7 +143,7 @@ export default async function Dashboard({ searchParams }: Props) {
           <Kpi titulo="Visitas a produtos" valor={num(m.kpis.visitas.atual)}>
             <Variacao {...m.kpis.visitas} />
           </Kpi>
-          <Kpi titulo="Cliques no Mercado Livre" valor={num(m.kpis.cliques.atual)}>
+          <Kpi titulo="Cliques de compra" valor={num(m.kpis.cliques.atual)}>
             <Variacao {...m.kpis.cliques} />
           </Kpi>
           <Kpi titulo="Taxa de clique" valor={pct(m.kpis.taxa.atual)}>
@@ -157,7 +157,7 @@ export default async function Dashboard({ searchParams }: Props) {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           <Kpi titulo="Total de produtos" valor={num(Number(resumoHoje.rows[0]?.total ?? 0))}>No catálogo</Kpi>
           <Kpi titulo="Produtos ativos" valor={num(Number(resumoHoje.rows[0]?.ativos ?? 0))}>Disponíveis na vitrine</Kpi>
-          <Kpi titulo="Visitas hoje" valor={num(Number(contagemHoje.rows[0]?.visitas ?? 0))}>{hoje}</Kpi>
+          <Kpi titulo="Páginas vistas hoje" valor={num(Number(contagemHoje.rows[0]?.visitas ?? 0))}>{hoje}</Kpi>
           <Kpi titulo="Cliques ML hoje" valor={num(Number(contagemHoje.rows[0]?.cliques_ml ?? 0))}>{hoje}</Kpi>
           <Kpi titulo="Cliques Shopee hoje" valor={num(Number(contagemHoje.rows[0]?.cliques_shopee ?? 0))}>{hoje}</Kpi>
         </div>

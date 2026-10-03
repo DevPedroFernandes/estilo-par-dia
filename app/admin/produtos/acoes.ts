@@ -104,7 +104,11 @@ function validar(v: Valores): string | null {
   const urls = v.imagens.split(/\s+/).filter(Boolean);
   if (!urls.length) return "Coloque pelo menos o link de uma foto.";
   if (urls.length > 12) return "Use no máximo 12 fotos.";
-  if (urls.some((u) => !/^https:\/\/\S+$/i.test(u))) return "Cada foto precisa ser um link começando com https://";
+  const aceitaLocal = process.env.NODE_ENV !== "production";
+  if (urls.some((u) => {
+    if (aceitaLocal && u.startsWith("/uploads/")) return false;
+    return !/^https:\/\/\S+$/i.test(u);
+  })) return "Cada foto precisa ser um link começando com https:// ou /uploads/ no desenvolvimento.";
   if (v.frase_destaque.length > 60) return "A frase do banner pode ter no máximo 60 caracteres.";
   return null;
 }

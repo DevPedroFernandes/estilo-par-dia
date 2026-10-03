@@ -15,7 +15,11 @@ export async function POST(request: Request) {
   if (!(await estaLogado())) return Response.json({ erro: "Não autenticado." }, { status: 401 });
 
   const origem = request.headers.get("origin");
-  if (!origem || new URL(origem).origin !== new URL(request.url).origin) {
+  try {
+    if (origem && new URL(origem).origin !== new URL(request.url).origin) {
+      return Response.json({ erro: "Origem inválida." }, { status: 403 });
+    }
+  } catch {
     return Response.json({ erro: "Origem inválida." }, { status: 403 });
   }
 

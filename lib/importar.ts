@@ -35,7 +35,11 @@ const RE_ID_FOTO = /(\d+-MLB\d+)/;
 export type Cor = { nome: string; hex: string };
 
 export function semAcento(t: string): string {
-  return (t || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return (t || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+export function montarBusca(titulo: string, categoria: string): string {
+  return semAcento(`${titulo} ${categoria}`);
 }
 
 function texto(v: unknown): string {
@@ -196,7 +200,7 @@ export async function importarCsv(
       imagens[0] ?? texto(l.imagem),
       JSON.stringify(imagens),
       limparDescricao(l.descricao, titulo, categoria),
-      semAcento(`${titulo} ${categoria}`),
+      montarBusca(titulo, categoria),
       posicao,
     ]);
   });
